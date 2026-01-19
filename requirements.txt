@@ -1,0 +1,26 @@
+# AI Assistant Pro - Dependencies
+
+# GUI Framework
+customtkinter>=5.2.0
+
+# System tray
+pystray>=0.19.5
+
+# Global hotkeys
+keyboard>=0.13.5
+
+# Screenshot capture
+mss>=9.0.1
+
+# Image processing
+pillow>=11.0.0
+
+# Gemini AI
+google-genai>=1.0.0
+
+# Clipboard and automation
+pyautogui>=0.9.54
+pyperclip>=1.8.2
+
+# Build tools (optional)
+pyinstaller>=6.0.0
