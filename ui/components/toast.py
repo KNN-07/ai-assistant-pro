@@ -51,6 +51,11 @@ class Toast(ctk.CTkFrame):
         self.theme = theme
         self.on_dismiss = on_dismiss
         self._duration = duration
+        self._destroyed = False
+        self._dismiss_timer_id = None
+        
+        # Bind destroy event
+        self.bind("<Destroy>", self._on_destroy)
         
         # Main container
         container = ctk.CTkFrame(self, fg_color="transparent")
@@ -107,13 +112,33 @@ class Toast(ctk.CTkFrame):
         
         # Auto-dismiss timer
         if duration > 0:
-            self.after(duration, self._dismiss)
+            self._dismiss_timer_id = self.after(duration, self._dismiss)
+    
+    def _on_destroy(self, event=None):
+        """Handle widget destruction."""
+        if event and event.widget == self:
+            self._destroyed = True
+            if self._dismiss_timer_id:
+                try:
+                    self.after_cancel(self._dismiss_timer_id)
+                except Exception:
+                    pass
+                self._dismiss_timer_id = None
     
     def _dismiss(self):
         """Dismiss this toast."""
+        if self._destroyed:
+            return
+        self._destroyed = True
         if self.on_dismiss:
-            self.on_dismiss(self)
-        self.destroy()
+            try:
+                self.on_dismiss(self)
+            except Exception:
+                pass
+        try:
+            self.destroy()
+        except Exception:
+            pass
 
 
 class ToastManager:
@@ -202,5 +227,8 @@ class ToastManager:
     def clear_all(self):
         """Dismiss all toasts."""
         for toast in self.toasts[:]:
-            toast.destroy()
+            try:
+                toast.destroy()
+            except Exception:
+                pass
         self.toasts.clear()

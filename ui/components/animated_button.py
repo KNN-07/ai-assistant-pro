@@ -94,6 +94,8 @@ class CaptureButton(ctk.CTkFrame):
         self._is_processing = False
         self._pulse_state = 0
         self._spinner_angle = 0
+        self._destroyed = False
+        self._after_id = None
         
         # Outer glow ring
         self.glow_ring = ctk.CTkFrame(
@@ -129,8 +131,20 @@ class CaptureButton(ctk.CTkFrame):
         )
         self.status_label.place(relx=0.5, rely=1.0, anchor="s", y=25)
         
+        # Bind destroy event to stop animation
+        self.bind("<Destroy>", self._on_destroy)
+        
         # Start pulse animation
         self._animate_pulse()
+    
+    def _on_destroy(self, event=None):
+        """Handle widget destruction."""
+        self._destroyed = True
+        if self._after_id:
+            try:
+                self.after_cancel(self._after_id)
+            except Exception:
+                pass
     
     def _on_click(self):
         if self.command and not self._is_processing:
@@ -138,48 +152,71 @@ class CaptureButton(ctk.CTkFrame):
     
     def _animate_pulse(self):
         """Animate the glow ring pulsing."""
-        if self._is_processing:
-            # Spinner animation
-            self._spinner_angle = (self._spinner_angle + 30) % 360
-            spinner_chars = ["◐", "◓", "◑", "◒"]
-            self.button.configure(text=spinner_chars[self._spinner_angle // 90])
-            self.after(100, self._animate_pulse)
-        else:
-            # Pulse animation - subtle opacity change via color
-            self._pulse_state = (self._pulse_state + 1) % 20
-            
-            # Calculate alpha-like effect by blending colors
-            if self._pulse_state < 10:
-                alpha = 0.3 + (self._pulse_state * 0.04)
+        # Check if widget still exists
+        if self._destroyed:
+            return
+        
+        try:
+            if not self.winfo_exists():
+                return
+        except Exception:
+            return
+        
+        try:
+            if self._is_processing:
+                # Spinner animation
+                self._spinner_angle = (self._spinner_angle + 30) % 360
+                spinner_chars = ["◐", "◓", "◑", "◒"]
+                self.button.configure(text=spinner_chars[self._spinner_angle // 90])
             else:
-                alpha = 0.7 - ((self._pulse_state - 10) * 0.04)
+                # Pulse animation - subtle opacity change via color
+                self._pulse_state = (self._pulse_state + 1) % 20
+                
+                # Blend primary color with background
+                self.glow_ring.configure(
+                    fg_color=self.theme.colors.primary if self._pulse_state < 10 
+                    else self.theme.colors.primary_hover
+                )
             
-            # Blend primary color with background
-            self.glow_ring.configure(
-                fg_color=self.theme.colors.primary if self._pulse_state < 10 
-                else self.theme.colors.primary_hover
-            )
-            
-            self.after(100, self._animate_pulse)
+            self._after_id = self.after(100, self._animate_pulse)
+        except Exception:
+            # Widget destroyed or error, stop animation
+            pass
     
     def set_processing(self, processing: bool, status: str = ""):
         """Set processing state."""
+        if self._destroyed:
+            return
+            
         self._is_processing = processing
         
-        if processing:
-            self.button.configure(
-                fg_color=self.theme.colors.warning,
-                hover_color=self.theme.colors.warning,
-            )
-            self.status_label.configure(text=status or "Processing...")
-        else:
-            self.button.configure(
-                text="⚡",
-                fg_color=self.theme.colors.primary,
-                hover_color=self.theme.colors.primary_hover,
-            )
-            self.status_label.configure(text=status or "Ready")
+        try:
+            if processing:
+                self.button.configure(
+                    fg_color=self.theme.colors.warning,
+                    hover_color=self.theme.colors.warning,
+                )
+                self.status_label.configure(text=status or "Processing...")
+            else:
+                self.button.configure(
+                    text="⚡",
+                    fg_color=self.theme.colors.primary,
+                    hover_color=self.theme.colors.primary_hover,
+                )
+                self.status_label.configure(text=status or "Ready")
+        except Exception:
+            pass
     
     def set_status(self, text: str):
         """Update status text."""
-        self.status_label.configure(text=text)
+        if self._destroyed:
+            return
+        try:
+            self.status_label.configure(text=text)
+        except Exception:
+            pass
+    
+    def destroy(self):
+        """Override destroy to cleanup."""
+        self._on_destroy()
+        super().destroy()

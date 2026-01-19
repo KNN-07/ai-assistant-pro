@@ -29,6 +29,11 @@ class StatusIndicator(ctk.CTkFrame):
         self._size = size
         self._pulse = pulse
         self._pulse_state = 0
+        self._destroyed = False
+        self._after_id = None
+        
+        # Bind destroy event
+        self.bind("<Destroy>", self._on_destroy)
         
         # Status colors
         self._colors = {
@@ -54,9 +59,21 @@ class StatusIndicator(ctk.CTkFrame):
         if pulse:
             self._animate_pulse()
     
+    def _on_destroy(self, event=None):
+        """Handle widget destruction."""
+        if event.widget == self:
+            self._destroyed = True
+            self._pulse = False
+            if self._after_id:
+                try:
+                    self.after_cancel(self._after_id)
+                except Exception:
+                    pass
+                self._after_id = None
+    
     def _animate_pulse(self):
         """Animate pulse effect."""
-        if not self._pulse:
+        if self._destroyed or not self._pulse:
             return
             
         self._pulse_state = (self._pulse_state + 1) % 20
@@ -67,10 +84,13 @@ class StatusIndicator(ctk.CTkFrame):
         else:
             scale = 1.2 - ((self._pulse_state - 10) * 0.02)
         
-        new_size = int(self._size * scale)
-        self.dot.configure(width=new_size, height=new_size, corner_radius=new_size // 2)
-        
-        self.after(80, self._animate_pulse)
+        try:
+            new_size = int(self._size * scale)
+            self.dot.configure(width=new_size, height=new_size, corner_radius=new_size // 2)
+            self._after_id = self.after(80, self._animate_pulse)
+        except Exception:
+            # Widget was destroyed
+            self._destroyed = True
     
     def set_status(self, status: Literal["success", "warning", "error", "info", "inactive"]):
         """Update status color."""
@@ -81,7 +101,7 @@ class StatusIndicator(ctk.CTkFrame):
         """Enable or disable pulse animation."""
         was_pulsing = self._pulse
         self._pulse = pulse
-        if pulse and not was_pulsing:
+        if pulse and not was_pulsing and not self._destroyed:
             self._animate_pulse()
 
 
