@@ -204,7 +204,7 @@ class GeminiIntegration:
             self.logger.error(error_msg)
             return error_msg
     
-    def test_connection(self) -> tuple[bool, str]:
+    def test_connection(self, retry_count: int = 0) -> tuple[bool, str]:
         """
         Test connection to Gemini API.
         
@@ -222,5 +222,13 @@ class GeminiIntegration:
             return True, "Connection successful"
         except Exception as e:
             error_msg = str(e)[:100]
+            max_retries = len(self.config.get_all_api_keys())
+            
+            if self._is_quota_error(e) and retry_count < max_retries:
+                self.logger.warning(f"Test connection quota error: {error_msg}")
+                if self._try_rotate_key():
+                    self.logger.info("Retrying test with rotated key...")
+                    return self.test_connection(retry_count + 1)
+            
             self.logger.error(f"Connection test failed: {error_msg}")
             return False, error_msg

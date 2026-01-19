@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 from logging.handlers import RotatingFileHandler
 from typing import Optional, Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 
 
@@ -155,7 +155,8 @@ class LogManager:
         
         handler = GUILogHandler(callback)
         self._gui_handlers.append(handler)
-        self._logger.addHandler(handler)
+        if self._logger:
+            self._logger.addHandler(handler)
         return handler
     
     def remove_gui_handler(self, handler: GUILogHandler) -> None:
@@ -173,7 +174,7 @@ class LogManager:
     def logger(self) -> logging.Logger:
         if self._logger is None:
             self.setup()
-        return self._logger
+        return self._logger  # type: ignore[return-value]
 
 
 # Module-level convenience functions
@@ -197,7 +198,3 @@ def get_logger() -> logging.Logger:
 def get_log_manager() -> LogManager:
     """Get the log manager instance."""
     return _log_manager
-
-
-# Default logger instance for backward compatibility
-logger = _log_manager.logger

@@ -150,11 +150,11 @@ class StatusCard(ctk.CTkFrame):
         }
         
         # Inner padding
-        inner = ctk.CTkFrame(self, fg_color="transparent")
-        inner.pack(fill="both", expand=True, padx=16, pady=16)
+        self._inner = ctk.CTkFrame(self, fg_color="transparent")
+        self._inner.pack(fill="both", expand=True, padx=16, pady=16)
         
         # Title row
-        title_row = ctk.CTkFrame(inner, fg_color="transparent")
+        title_row = ctk.CTkFrame(self._inner, fg_color="transparent")
         title_row.pack(fill="x")
         
         self.title_widget = ctk.CTkLabel(
@@ -167,7 +167,7 @@ class StatusCard(ctk.CTkFrame):
         self.title_widget.pack(side="left")
         
         # Status row
-        status_row = ctk.CTkFrame(inner, fg_color="transparent")
+        status_row = ctk.CTkFrame(self._inner, fg_color="transparent")
         status_row.pack(fill="x", pady=(8, 0))
         
         # Status dot
@@ -192,7 +192,7 @@ class StatusCard(ctk.CTkFrame):
         # Description
         if description:
             self.desc_widget = ctk.CTkLabel(
-                inner,
+                self._inner,
                 text=description,
                 text_color=theme.colors.text_tertiary,
                 font=theme.get_font("sm"),
@@ -213,5 +213,15 @@ class StatusCard(ctk.CTkFrame):
         self.dot.configure(text_color=color)
         self.status_widget.configure(text=status)
         
-        if self.desc_widget and description:
-            self.desc_widget.configure(text=description)
+        if description:
+            if self.desc_widget:
+                self.desc_widget.configure(text=description)
+            else:
+                self.desc_widget = ctk.CTkLabel(
+                    self._inner,
+                    text=description,
+                    text_color=self.theme.colors.text_tertiary,
+                    font=self.theme.get_font("sm"),
+                    anchor="w",
+                )
+                self.desc_widget.pack(fill="x", pady=(8, 0))

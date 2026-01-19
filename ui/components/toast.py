@@ -116,7 +116,7 @@ class Toast(ctk.CTkFrame):
     
     def _on_destroy(self, event=None):
         """Handle widget destruction."""
-        if event and event.widget == self:
+        if event is not None and event.widget == self:
             self._destroyed = True
             if self._dismiss_timer_id:
                 try:

@@ -44,7 +44,8 @@ class FloatingWidget(ctk.CTkToplevel):
     
     def _on_destroy(self, event=None):
         """Handle widget destruction."""
-        self._destroyed = True
+        if event is None or event.widget == self:
+            self._destroyed = True
     
     def _create_ui(self):
         """Create the widget UI."""

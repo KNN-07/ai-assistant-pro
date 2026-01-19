@@ -18,9 +18,8 @@ class AutoPaste:
         self.restore_clipboard = restore_clipboard
         self._logger = None
         
-        # Import and configure pyautogui
         import pyautogui
-        pyautogui.FAILSAFE = False
+        pyautogui.PAUSE = 0.1
     
     @property
     def logger(self):

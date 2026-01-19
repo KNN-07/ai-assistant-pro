@@ -1,7 +1,7 @@
 """Enhanced configuration management for AI Assistant Pro."""
 import json
 from pathlib import Path
-from typing import Any, Dict, Optional, TypeVar, Generic
+from typing import Any, Callable, Dict, List
 from dataclasses import dataclass, field, asdict
 from enum import Enum
 
@@ -82,16 +82,21 @@ class AppConfig:
 class ConfigManager:
     """Enhanced configuration manager with type-safe access."""
     
-    def __init__(self, config_path: str = "config.json"):
+    _DEFAULT_CONFIG_NAME = "config.json"
+    
+    def __init__(self, config_path: str = ""):
         """
         Initialize configuration manager.
         
         Args:
-            config_path: Path to configuration file
+            config_path: Path to configuration file (defaults to config.json in app directory)
         """
-        self.config_path = Path(config_path)
+        if config_path:
+            self.config_path = Path(config_path)
+        else:
+            self.config_path = Path(__file__).parent.parent / self._DEFAULT_CONFIG_NAME
         self._raw_config: Dict[str, Any] = {}
-        self._observers: list[callable] = []
+        self._observers: List[Callable[['ConfigManager'], None]] = []
         self.load()
     
     def load(self) -> None:
@@ -115,17 +120,21 @@ class ConfigManager:
     
     def _notify_observers(self) -> None:
         """Notify all observers of config change."""
+        from .logger import get_logger
         for observer in self._observers:
             try:
                 observer(self)
-            except Exception:
-                pass
+            except Exception as e:
+                try:
+                    get_logger().warning(f"Config observer callback failed: {e}")
+                except Exception:
+                    pass
     
-    def add_observer(self, callback: callable) -> None:
+    def add_observer(self, callback: Callable[['ConfigManager'], None]) -> None:
         """Add a config change observer."""
         self._observers.append(callback)
     
-    def remove_observer(self, callback: callable) -> None:
+    def remove_observer(self, callback: Callable[['ConfigManager'], None]) -> None:
         """Remove a config change observer."""
         if callback in self._observers:
             self._observers.remove(callback)

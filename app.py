@@ -3,15 +3,11 @@ import os
 import sys
 import threading
 from pathlib import Path
-from typing import Optional, List
-
-# Add parent to path for imports
-sys.path.insert(0, str(Path(__file__).parent))
+from queue import Queue
 
 from core import (
     ConfigManager,
     setup_logger,
-    get_logger,
     GeminiIntegration,
     ScreenshotCapture,
     AutoPaste,
@@ -50,7 +46,8 @@ class AIAssistantPro:
         # State
         self.is_enabled = True
         self.is_processing = False
-        self.image_queue: List = []
+        self.image_queue: Queue = Queue()
+        self._queue_lock = threading.Lock()
         
         # UI components (lazy loaded)
         self._main_window = None
@@ -154,9 +151,9 @@ class AIAssistantPro:
         """Capture and queue a screenshot."""
         try:
             image = self.screenshot.capture_full_screen()
-            self.image_queue.append(image)
+            self.image_queue.put(image)
             
-            count = len(self.image_queue)
+            count = self.image_queue.qsize()
             self.logger.info(f"Screenshot queued. Total: {count}")
             
             # Update UI
@@ -181,12 +178,22 @@ class AIAssistantPro:
             self.is_processing = True
             self._update_processing_state(True, "Capturing...")
             
-            # Determine images to process
-            if self.image_queue:
-                self.logger.info(f"Processing {len(self.image_queue)} queued images...")
-                images = list(self.image_queue)
-                self.image_queue.clear()
+            # Determine images to process - drain queue thread-safely
+            images = []
+            with self._queue_lock:
+                while not self.image_queue.empty():
+                    try:
+                        images.append(self.image_queue.get_nowait())
+                    except Exception:
+                        break
+            
+            if images:
+                self.logger.info(f"Processing {len(images)} queued images...")
                 self.system_tray.update_queue_count(0)
+                if self._main_window:
+                    self._main_window.update_queue_count(0)
+                if self._floating_widget:
+                    self._floating_widget.update_queue_count(0)
             else:
                 self.logger.info("Capturing screenshot...")
                 images = self.screenshot.capture_full_screen()
