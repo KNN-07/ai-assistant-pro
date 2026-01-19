@@ -272,7 +272,28 @@ class AIAssistantPro:
                 self._main_window,
                 config_manager=self.config,
                 on_save=self._on_settings_saved,
+                on_test_capture=self._on_test_capture,
             )
+    
+    def _on_test_capture(self):
+        """Handle test capture from settings window."""
+        try:
+            self.logger.info("Test capture initiated...")
+            
+            # Temporarily enable saving to disk
+            original_save = self.screenshot.save_to_disk
+            self.screenshot.save_to_disk = True
+            
+            # Capture screenshot
+            self.screenshot.capture_full_screen()
+            
+            # Restore original setting
+            self.screenshot.save_to_disk = original_save
+            
+            self.logger.info("Test capture completed successfully")
+            
+        except Exception as e:
+            self.logger.error(f"Test capture failed: {e}")
     
     def _on_settings_saved(self):
         """Handle settings saved."""

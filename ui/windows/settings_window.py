@@ -17,6 +17,7 @@ class SettingsWindow(ctk.CTkToplevel):
         config_manager: 'ConfigManager',
         on_save: Optional[Callable[[], None]] = None,
         on_test_api: Optional[Callable[[str], tuple]] = None,
+        on_test_capture: Optional[Callable[[], None]] = None,
         **kwargs
     ):
         super().__init__(parent, **kwargs)
@@ -25,6 +26,7 @@ class SettingsWindow(ctk.CTkToplevel):
         self.config = config_manager
         self.on_save = on_save
         self.on_test_api = on_test_api
+        self.on_test_capture = on_test_capture
         
         # Temp storage for unsaved changes
         self._temp_api_keys = list(config_manager.get_all_api_keys())
@@ -205,6 +207,20 @@ class SettingsWindow(ctk.CTkToplevel):
         )
         add_btn.pack(side="right")
         
+        # Test API button
+        test_frame = ctk.CTkFrame(card.content, fg_color="transparent")
+        test_frame.pack(fill="x", pady=(0, 12))
+        
+        test_btn = AnimatedButton(
+            test_frame,
+            text="Test Selected Key",
+            style="secondary",
+            width=140,
+            height=32,
+            command=self._test_api_key,
+        )
+        test_btn.pack(side="left")
+        
         # Model name
         model_frame = ctk.CTkFrame(card.content, fg_color="transparent")
         model_frame.pack(fill="x", pady=(0, 12))
@@ -328,6 +344,68 @@ class SettingsWindow(ctk.CTkToplevel):
             self._temp_api_keys.remove(key)
             self._refresh_keys_list()
     
+    def _test_api_key(self):
+        """Test the first API key in the list."""
+        if not self._temp_api_keys:
+            self._show_message("No API keys", "Please add an API key first.", "warning")
+            return
+        
+        # Test the first (active) key
+        current_idx = self.config.get('gemini.current_key_index', 0)
+        if current_idx >= len(self._temp_api_keys):
+            current_idx = 0
+        
+        api_key = self._temp_api_keys[current_idx]
+        
+        try:
+            from google import genai
+            
+            model = self.model_entry.get().strip() or self.config.get_model()
+            client = genai.Client(api_key=api_key)
+            response = client.models.generate_content(
+                model=model,
+                contents="Hello"
+            )
+            self._show_message(
+                "Success",
+                f"API key #{current_idx + 1} works correctly!",
+                "success"
+            )
+        except Exception as e:
+            self._show_message(
+                "Test Failed",
+                f"Error: {str(e)[:100]}",
+                "error"
+            )
+    
+    def _test_capture(self):
+        """Test screenshot capture."""
+        if self.on_test_capture:
+            self.on_test_capture()
+            self._show_message(
+                "Capture Complete",
+                "Screenshot captured! Check the logs directory.",
+                "success"
+            )
+    
+    def _show_message(self, title: str, message: str, msg_type: str = "info"):
+        """Show a toast message or dialog."""
+        try:
+            # Try to use toast from parent window
+            if hasattr(self.master, 'show_toast'):
+                self.master.show_toast(message, msg_type, title)
+            else:
+                # Fallback to simple dialog
+                from tkinter import messagebox
+                if msg_type == "error":
+                    messagebox.showerror(title, message, parent=self)
+                elif msg_type == "warning":
+                    messagebox.showwarning(title, message, parent=self)
+                else:
+                    messagebox.showinfo(title, message, parent=self)
+        except Exception:
+            pass
+    
     def _create_prompt_section(self, parent):
         """Create system prompt section."""
         self._create_section_header(parent, "System Prompt", "Customize AI behavior")
@@ -393,6 +471,20 @@ class SettingsWindow(ctk.CTkToplevel):
             hover_color=self.theme.colors.primary_hover,
             text_color=self.theme.colors.text_primary,
             font=self.theme.get_font("sm"),
+        ).pack(anchor="w", pady=(0, 8))
+        
+        # Show floating widget
+        self.show_widget_var = ctk.BooleanVar(
+            value=self.config.get('ui.show_floating_widget', True)
+        )
+        ctk.CTkCheckBox(
+            card.content,
+            text="Show floating widget",
+            variable=self.show_widget_var,
+            fg_color=self.theme.colors.primary,
+            hover_color=self.theme.colors.primary_hover,
+            text_color=self.theme.colors.text_primary,
+            font=self.theme.get_font("sm"),
         ).pack(anchor="w", pady=(0, 12))
         
         # Paste delay
@@ -432,6 +524,17 @@ class SettingsWindow(ctk.CTkToplevel):
         )
         cancel_btn.pack(side="left")
         
+        # Test Capture button
+        if self.on_test_capture:
+            test_capture_btn = AnimatedButton(
+                footer,
+                text="Test Capture",
+                style="secondary",
+                width=110,
+                command=self._test_capture,
+            )
+            test_capture_btn.pack(side="left", padx=(10, 0))
+        
         save_btn = AnimatedButton(
             footer,
             text="Save Changes",
@@ -463,6 +566,7 @@ class SettingsWindow(ctk.CTkToplevel):
         self.config.set('auto_paste.enabled', self.auto_paste_var.get())
         self.config.set('auto_paste.restore_clipboard', self.restore_clipboard_var.get())
         self.config.set('startup.launch_on_boot', self.startup_var.get())
+        self.config.set('ui.show_floating_widget', self.show_widget_var.get())
         
         try:
             delay = int(self.delay_entry.get())
