@@ -205,6 +205,30 @@ class SettingsWindow(ctk.CTkToplevel):
         )
         add_btn.pack(side="right")
         
+        # Model name
+        model_frame = ctk.CTkFrame(card.content, fg_color="transparent")
+        model_frame.pack(fill="x", pady=(0, 12))
+        
+        ctk.CTkLabel(
+            model_frame,
+            text="Model",
+            text_color=self.theme.colors.text_primary,
+            font=self.theme.get_font("sm"),
+        ).pack(side="left")
+        
+        self.model_entry = ctk.CTkEntry(
+            model_frame,
+            width=220,
+            height=36,
+            fg_color=self.theme.colors.bg_light,
+            border_color=self.theme.colors.border,
+            text_color=self.theme.colors.text_primary,
+            placeholder_text="e.g. gemini-2.5-flash-preview-05-20",
+            font=self.theme.get_font("sm"),
+        )
+        self.model_entry.pack(side="right")
+        self.model_entry.insert(0, self.config.get_model())
+        
         # Auto-rotate checkbox
         self.auto_rotate_var = ctk.BooleanVar(value=self.config.is_auto_rotate_enabled())
         auto_rotate_cb = ctk.CTkCheckBox(
@@ -423,9 +447,14 @@ class SettingsWindow(ctk.CTkToplevel):
         self.config.set('hotkey', self.hotkey_entry.get().strip())
         self.config.set('capture_hotkey', self.capture_hotkey_entry.get().strip())
         
-        # API keys
+        # API keys and model
         self.config.set('gemini.api_keys', self._temp_api_keys)
         self.config.set('gemini.auto_rotate_on_quota_error', self.auto_rotate_var.get())
+        
+        # Model name
+        model_name = self.model_entry.get().strip()
+        if model_name:
+            self.config.set('gemini.model', model_name)
         
         # Prompt
         self.config.set('gemini.system_prompt', self.prompt_text.get("1.0", "end").strip())
