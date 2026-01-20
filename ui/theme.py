@@ -31,20 +31,20 @@ class ThemeColors:
     
     # Text colors
     text_primary: str = "#ffffff"      # Main text
-    text_secondary: str = "#9ca3af"    # Muted text
-    text_tertiary: str = "#6b7280"     # Even more muted
+    text_secondary: str = "#cbd5e1"    # Muted text (lighter for better contrast)
+    text_tertiary: str = "#94a3b8"     # Even more muted (lighter for better contrast)
     text_dark: str = "#1f2937"         # Text for light theme
     
     # Status colors
-    success: str = "#22c55e"           # Green
-    error: str = "#ef4444"             # Red
-    warning: str = "#f59e0b"           # Amber
-    info: str = "#3b82f6"              # Blue
+    success: str = "#34d399"           # Emerald-400 (brighter green)
+    error: str = "#f87171"             # Red-400 (softer red)
+    warning: str = "#fbbf24"           # Amber-400 (warmer yellow)
+    info: str = "#60a5fa"              # Blue-400 (softer blue)
     
     # Border colors
-    border: str = "#2a2a3c"
-    border_light: str = "#363648"
-    border_focus: str = "#6366f1"
+    border: str = "#3f3f4e"            # Lighter border for visibility
+    border_light: str = "#4b4b5c"
+    border_focus: str = "#818cf8"
     
     # Gradients (as tuples of colors)
     gradient_primary: tuple = ("#6366f1", "#8b5cf6")  # Indigo to Purple
@@ -74,26 +74,26 @@ class ThemeFonts:
 class ThemeDimensions:
     """Size and spacing configuration."""
     # Border radius
-    radius_sm: int = 6
-    radius_md: int = 10
-    radius_lg: int = 16
-    radius_xl: int = 24
+    radius_sm: int = 8
+    radius_md: int = 12
+    radius_lg: int = 20
+    radius_xl: int = 28
     radius_full: int = 999  # For pills
     
     # Spacing (padding/margin)
-    space_xs: int = 4
-    space_sm: int = 8
-    space_md: int = 12
-    space_lg: int = 16
-    space_xl: int = 24
-    space_xxl: int = 32
+    space_xs: int = 6
+    space_sm: int = 10
+    space_md: int = 16
+    space_lg: int = 24
+    space_xl: int = 32
+    space_xxl: int = 48
     
     # Component sizes
-    button_height: int = 40
-    button_height_sm: int = 32
-    button_height_lg: int = 48
-    input_height: int = 40
-    card_min_width: int = 300
+    button_height: int = 44
+    button_height_sm: int = 36
+    button_height_lg: int = 56
+    input_height: int = 44
+    card_min_width: int = 320
 
 
 @dataclass(frozen=True)
