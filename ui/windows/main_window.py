@@ -54,17 +54,17 @@ class MainWindow(ctk.CTk):
     def _setup_window(self):
         """Configure window properties."""
         self.title(self.APP_NAME)
-        self.geometry("480x720")
-        self.minsize(400, 600)
+        self.geometry("580x840")
+        self.minsize(500, 700)
         
         # Dark title bar on Windows
         self.configure(fg_color=self.theme.colors.bg_dark)
         
         # Center on screen
         self.update_idletasks()
-        x = (self.winfo_screenwidth() - 480) // 2
-        y = (self.winfo_screenheight() - 720) // 2
-        self.geometry(f"480x720+{x}+{y}")
+        x = (self.winfo_screenwidth() - 580) // 2
+        y = (self.winfo_screenheight() - 840) // 2
+        self.geometry(f"580x840+{x}+{y}")
         
         # Handle close
         self.protocol("WM_DELETE_WINDOW", self._on_close)
@@ -73,7 +73,7 @@ class MainWindow(ctk.CTk):
         """Create the main UI layout."""
         # Main container with padding
         container = ctk.CTkFrame(self, fg_color="transparent")
-        container.pack(fill="both", expand=True, padx=20, pady=20)
+        container.pack(fill="both", expand=True, padx=28, pady=28)
         
         # Header
         self._create_header(container)

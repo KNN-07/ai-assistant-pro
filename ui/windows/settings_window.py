@@ -37,8 +37,8 @@ class SettingsWindow(ctk.CTkToplevel):
     def _setup_window(self):
         """Configure window properties."""
         self.title("Settings")
-        self.geometry("550x650")
-        self.minsize(500, 600)
+        self.geometry("600x720")
+        self.minsize(560, 680)
         self.configure(fg_color=self.theme.colors.bg_dark)
         
         # Make modal
@@ -51,15 +51,15 @@ class SettingsWindow(ctk.CTkToplevel):
         parent_y = self.master.winfo_y()
         parent_w = self.master.winfo_width()
         parent_h = self.master.winfo_height()
-        x = parent_x + (parent_w - 550) // 2
-        y = parent_y + (parent_h - 650) // 2
-        self.geometry(f"550x650+{x}+{y}")
+        x = parent_x + (parent_w - 600) // 2
+        y = parent_y + (parent_h - 720) // 2
+        self.geometry(f"600x720+{x}+{y}")
     
     def _create_ui(self):
         """Create the settings UI."""
         # Main container
         container = ctk.CTkFrame(self, fg_color="transparent")
-        container.pack(fill="both", expand=True, padx=20, pady=20)
+        container.pack(fill="both", expand=True, padx=28, pady=28)
         
         # Header
         header = ctk.CTkFrame(container, fg_color="transparent")
