@@ -1,4 +1,5 @@
 """Animated button components for AI Assistant Pro."""
+import math
 import customtkinter as ctk
 from typing import Callable, Optional, Literal
 from ui.theme import get_theme
@@ -149,7 +150,27 @@ class CaptureButton(ctk.CTkFrame):
     def _on_click(self):
         if self.command and not self._is_processing:
             self.command()
-    
+
+    def _lerp_color(self, c1: str, c2: str, t: float) -> str:
+        """Interpolate between two hex colors."""
+        if t <= 0: return c1
+        if t >= 1: return c2
+        
+        c1 = c1.lstrip('#')
+        c2 = c2.lstrip('#')
+        
+        try:
+            r1, g1, b1 = tuple(int(c1[i:i+2], 16) for i in (0, 2, 4))
+            r2, g2, b2 = tuple(int(c2[i:i+2], 16) for i in (0, 2, 4))
+            
+            r = int(r1 + (r2 - r1) * t)
+            g = int(g1 + (g2 - g1) * t)
+            b = int(b1 + (b2 - b1) * t)
+            
+            return f"#{r:02x}{g:02x}{b:02x}"
+        except Exception:
+            return c1
+
     def _animate_pulse(self):
         """Animate the glow ring pulsing."""
         # Check if widget still exists
@@ -163,22 +184,36 @@ class CaptureButton(ctk.CTkFrame):
             return
         
         try:
-            if self._is_processing:
-                # Spinner animation
-                self._spinner_angle = (self._spinner_angle + 30) % 360
-                spinner_chars = ["◐", "◓", "◑", "◒"]
-                self.button.configure(text=spinner_chars[self._spinner_angle // 90])
-            else:
-                # Pulse animation - subtle opacity change via color
-                self._pulse_state = (self._pulse_state + 1) % 20
-                
-                # Blend primary color with background
-                self.glow_ring.configure(
-                    fg_color=self.theme.colors.primary if self._pulse_state < 10 
-                    else self.theme.colors.primary_hover
-                )
+            delay = 50
             
-            self._after_id = self.after(100, self._animate_pulse)
+            if self._is_processing:
+                # Spinner animation - smoother rotation
+                self._spinner_angle = (self._spinner_angle + 20) % 360
+                spinner_chars = ["◐", "◓", "◑", "◒"]
+                # Change char every 90 degrees
+                char_idx = (self._spinner_angle // 90) % 4
+                self.button.configure(text=spinner_chars[char_idx])
+                
+                # Pulse color during processing too
+                t = (math.sin(self._spinner_angle * 0.1) + 1) / 2
+                # Pulse between warning and a lighter warning/white mix
+                col = self._lerp_color(self.theme.colors.warning, "#fcd34d", t)
+                self.button.configure(fg_color=col)
+                
+            else:
+                # Smooth pulse animation (sine wave)
+                self._pulse_state += 0.15
+                
+                # Sine wave 0..1
+                t = (math.sin(self._pulse_state) + 1) / 2
+                
+                # Interpolate between primary and primary_hover
+                # We use the theme colors directly
+                color = self._lerp_color(self.theme.colors.primary, self.theme.colors.primary_hover, t)
+                
+                self.glow_ring.configure(fg_color=color)
+            
+            self._after_id = self.after(delay, self._animate_pulse)
         except Exception:
             # Widget destroyed or error, stop animation
             pass
