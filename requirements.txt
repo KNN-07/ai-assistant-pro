@@ -22,5 +22,8 @@ google-genai>=1.0.0
 pyautogui>=0.9.54
 pyperclip>=1.8.2
 
+# File watching for hot reload
+watchdog>=3.0.0
+
 # Build tools (optional)
 pyinstaller>=6.0.0

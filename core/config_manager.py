@@ -4,6 +4,8 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 from dataclasses import dataclass, field, asdict
 from enum import Enum
+from watchdog.observers import Observer
+from watchdog.events import FileSystemEventHandler, FileModifiedEvent
 from .secure_storage import SecureStorage
 
 
@@ -80,17 +82,35 @@ class AppConfig:
     ui: UIConfig = field(default_factory=UIConfig)
 
 
+class ConfigFileEventHandler(FileSystemEventHandler):
+    """Handles file system events for config file changes."""
+
+    def __init__(self, config_manager: 'ConfigManager'):
+        """Initialize event handler with config manager reference."""
+        super().__init__()
+        self.config_manager = config_manager
+
+    def on_modified(self, event: FileModifiedEvent) -> None:
+        """Handle file modification event."""
+        if event.is_directory:
+            return
+
+        if Path(event.src_path).resolve() == self.config_manager.config_path.resolve():
+            self.config_manager._reload_from_disk()
+
+
 class ConfigManager:
-    """Enhanced configuration manager with type-safe access."""
-    
+    """Enhanced configuration manager with type-safe access and hot reload."""
+
     _DEFAULT_CONFIG_NAME = "config.json"
-    
-    def __init__(self, config_path: str = ""):
+
+    def __init__(self, config_path: str = "", auto_watch: bool = True):
         """
         Initialize configuration manager.
-        
+
         Args:
             config_path: Path to configuration file (defaults to config.json in app directory)
+            auto_watch: Automatically watch config file for changes (default: True)
         """
         if config_path:
             self.config_path = Path(config_path)
@@ -99,8 +119,13 @@ class ConfigManager:
         self._raw_config: Dict[str, Any] = {}
         self._observers: List[Callable[['ConfigManager'], None]] = []
         self._secure_storage = SecureStorage()
+        self._file_observer: Optional[Observer] = None
+        self._watching = False
         self.load()
         self._migrate_api_keys()
+
+        if auto_watch:
+            self.start_watching()
     
     def load(self) -> None:
         """Load configuration from file."""
@@ -141,7 +166,59 @@ class ConfigManager:
         """Remove a config change observer."""
         if callback in self._observers:
             self._observers.remove(callback)
-    
+
+    def _reload_from_disk(self) -> None:
+        """Reload configuration from disk when file changes detected."""
+        from .logger import get_logger
+        try:
+            get_logger().info(f"Config file changed, reloading: {self.config_path}")
+            old_config = self._raw_config.copy()
+            self.load()
+
+            if old_config != self._raw_config:
+                get_logger().info("Config reloaded successfully")
+        except Exception as e:
+            get_logger().error(f"Failed to reload config: {e}")
+
+    def start_watching(self) -> None:
+        """Start watching the config file for changes."""
+        if self._watching:
+            return
+
+        from .logger import get_logger
+        try:
+            self._file_observer = Observer()
+            event_handler = ConfigFileEventHandler(self)
+
+            watch_dir = self.config_path.parent
+            self._file_observer.schedule(event_handler, str(watch_dir), recursive=False)
+            self._file_observer.start()
+            self._watching = True
+
+            get_logger().info(f"Started watching config file: {self.config_path}")
+        except Exception as e:
+            get_logger().error(f"Failed to start config file watcher: {e}")
+
+    def stop_watching(self) -> None:
+        """Stop watching the config file."""
+        if not self._watching or not self._file_observer:
+            return
+
+        from .logger import get_logger
+        try:
+            self._file_observer.stop()
+            self._file_observer.join(timeout=2)
+            self._file_observer = None
+            self._watching = False
+
+            get_logger().info("Stopped watching config file")
+        except Exception as e:
+            get_logger().error(f"Failed to stop config file watcher: {e}")
+
+    def __del__(self):
+        """Cleanup when object is destroyed."""
+        self.stop_watching()
+
     def get(self, key: str, default: Any = None) -> Any:
         """
         Get configuration value using dot notation.
