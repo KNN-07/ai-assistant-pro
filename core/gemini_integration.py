@@ -1,9 +1,25 @@
 """Gemini AI integration with automatic API key rotation."""
+import socket
 from typing import TYPE_CHECKING, Optional, Union
 
 if TYPE_CHECKING:
     from PIL import Image
     from .config_manager import ConfigManager
+
+
+class GeminiIntegrationError(Exception):
+    """Base exception for Gemini integration errors."""
+    pass
+
+
+class GeminiQuotaError(GeminiIntegrationError):
+    """Exception for quota/rate limit errors."""
+    pass
+
+
+class GeminiTimeoutError(GeminiIntegrationError):
+    """Exception for network timeout errors."""
+    pass
 
 
 class GeminiIntegration:
@@ -17,6 +33,7 @@ class GeminiIntegration:
         'too many requests',
         'exceeded'
     ]
+    DEFAULT_TIMEOUT = 30  # seconds
     
     def __init__(self, config_manager: 'ConfigManager', model_name: Optional[str] = None):
         """
@@ -44,16 +61,22 @@ class GeminiIntegration:
             self._logger = get_logger()
         return self._logger
     
-    def _initialize_client(self, api_key: str) -> None:
-        """Initialize Gemini client with API key."""
+    def _initialize_client(self, api_key: str, timeout: Optional[int] = None) -> None:
+        """Initialize Gemini client with API key and timeout."""
+        timeout = timeout or self.DEFAULT_TIMEOUT
         try:
             from google import genai
+            # Set socket timeout for all network operations
+            socket.setdefaulttimeout(timeout)
             self.client = genai.Client(api_key=api_key)
             self.current_api_key = api_key
             self.logger.info(f"Gemini client initialized with model: {self.model_name}")
+        except ImportError as e:
+            self.logger.error(f"Failed to import Google GenAI library: {e}")
+            raise GeminiIntegrationError(f"Google GenAI library not installed: {e}")
         except Exception as e:
             self.logger.error(f"Failed to initialize Gemini client: {e}")
-            raise
+            raise GeminiIntegrationError(f"Failed to initialize Gemini client: {e}")
     
     def _is_quota_error(self, error: Exception) -> bool:
         """Check if error is a quota/rate limit error."""
@@ -87,7 +110,7 @@ class GeminiIntegration:
             key_index = self.config.get('gemini.current_key_index', 0)
             self.logger.info(f"Rotated to API key #{key_index + 1}")
             return True
-        except Exception as e:
+        except GeminiIntegrationError as e:
             self.logger.error(f"Failed to initialize with rotated key: {e}")
             return False
     
@@ -137,18 +160,23 @@ class GeminiIntegration:
             self.logger.info(f"Received response ({len(result_text)} chars)")
             return result_text
             
+        except socket.timeout:
+            error_msg = "Request timed out after 30 seconds"
+            self.logger.error(error_msg)
+            return f"Error: {error_msg}"
         except Exception as e:
+            error_str = str(e).lower()
             max_retries = len(self.config.get_all_api_keys())
+            
             if self._is_quota_error(e) and retry_count < max_retries:
-                self.logger.warning(f"Quota error: {str(e)[:100]}")
+                self.logger.warning(f"Quota error: {error_str[:100]}")
                 
                 if self._try_rotate_key():
                     self.logger.info("Retrying with rotated key...")
                     return self.analyze_screenshot_sync(images, prompt, retry_count + 1)
             
-            error_msg = f"Error analyzing screenshot: {str(e)}"
-            self.logger.error(error_msg)
-            return error_msg
+            self.logger.error(f"Error analyzing screenshot: {error_str[:100]}")
+            return f"Error analyzing screenshot: {error_str[:100]}"
     
     async def analyze_screenshot(
         self,
@@ -191,18 +219,23 @@ class GeminiIntegration:
             self.logger.info(f"Received response ({len(result_text)} chars)")
             return result_text
             
+        except socket.timeout:
+            error_msg = "Request timed out after 30 seconds"
+            self.logger.error(error_msg)
+            return f"Error: {error_msg}"
         except Exception as e:
+            error_str = str(e).lower()
             max_retries = len(self.config.get_all_api_keys())
+            
             if self._is_quota_error(e) and retry_count < max_retries:
-                self.logger.warning(f"Quota error: {str(e)[:100]}")
+                self.logger.warning(f"Quota error: {error_str[:100]}")
                 
                 if self._try_rotate_key():
                     self.logger.info("Retrying with rotated key...")
                     return await self.analyze_screenshot(images, prompt, retry_count + 1)
             
-            error_msg = f"Error analyzing screenshot: {str(e)}"
-            self.logger.error(error_msg)
-            return error_msg
+            self.logger.error(f"Error analyzing screenshot: {error_str[:100]}")
+            return f"Error analyzing screenshot: {error_str[:100]}"
     
     def test_connection(self, retry_count: int = 0) -> tuple[bool, str]:
         """
@@ -220,6 +253,8 @@ class GeminiIntegration:
                 contents="Hello"
             )
             return True, "Connection successful"
+        except socket.timeout:
+            return False, "Connection timed out"
         except Exception as e:
             error_msg = str(e)[:100]
             max_retries = len(self.config.get_all_api_keys())
