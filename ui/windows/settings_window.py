@@ -568,13 +568,64 @@ class SettingsWindow(ctk.CTkToplevel):
         self.config.set('startup.launch_on_boot', self.startup_var.get())
         self.config.set('ui.show_floating_widget', self.show_widget_var.get())
         
-        try:
-            delay = int(self.delay_entry.get())
-            self.config.set('auto_paste.delay_ms', delay)
-        except ValueError:
-            pass
+        # Validate and save paste delay
+        delay_str = self.delay_entry.get().strip()
+        if delay_str:
+            try:
+                delay = int(delay_str)
+                if 100 <= delay <= 10000:
+                    self.config.set('auto_paste.delay_ms', delay)
+                else:
+                    self._show_message("Invalid Value", "Paste delay must be between 100ms and 10000ms", "warning")
+                    return
+            except ValueError:
+                self._show_message("Invalid Value", "Paste delay must be a valid number", "warning")
+                return
+        
+        # Validate hotkey format
+        hotkey = self.hotkey_entry.get().strip()
+        if not self._is_valid_hotkey_format(hotkey):
+            self._show_message("Invalid Hotkey", "Hotkey format is invalid. Use format like: ctrl+shift+alt+a", "warning")
+            return
         
         if self.on_save:
             self.on_save()
         
         self.destroy()
+    
+    def _is_valid_hotkey_format(self, hotkey: str) -> bool:
+        """Validate hotkey format.
+        
+        Args:
+            hotkey: Hotkey string to validate
+            
+        Returns:
+            True if format is valid
+        """
+        if not hotkey:
+            return False
+        
+        # Basic validation: should contain at least one + separator
+        # and at least one alphabetic/numeric key
+        parts = hotkey.lower().split('+')
+        if len(parts) < 2:
+            return False
+        
+        # Check for valid modifiers and key
+        valid_modifiers = {'ctrl', 'alt', 'shift', 'win', 'command', 'cmd'}
+        has_key = False
+        
+        for part in parts:
+            part = part.strip()
+            if not part:
+                continue
+            if part not in valid_modifiers:
+                # This should be the actual key (letter, number, f-key, etc.)
+                if len(part) == 1 and part.isalnum():
+                    has_key = True
+                elif part.startswith('f') and part[1:].isdigit() and 1 <= int(part[1:]) <= 24:
+                    has_key = True  # F1-F24
+                elif part in {'space', 'tab', 'enter', 'esc', 'delete', 'backspace', 'insert', 'home', 'end', 'pageup', 'pagedown'}:
+                    has_key = True
+        
+        return has_key
