@@ -1,9 +1,10 @@
 """Enhanced configuration management for AI Assistant Pro."""
 import json
 from pathlib import Path
-from typing import Any, Callable, Dict, List
+from typing import Any, Callable, Dict, List, Optional
 from dataclasses import dataclass, field, asdict
 from enum import Enum
+from .secure_storage import SecureStorage
 
 
 class ScreenshotMode(Enum):
@@ -97,7 +98,9 @@ class ConfigManager:
             self.config_path = Path(__file__).parent.parent / self._DEFAULT_CONFIG_NAME
         self._raw_config: Dict[str, Any] = {}
         self._observers: List[Callable[['ConfigManager'], None]] = []
+        self._secure_storage = SecureStorage()
         self.load()
+        self._migrate_api_keys()
     
     def load(self) -> None:
         """Load configuration from file."""
@@ -217,70 +220,110 @@ class ConfigManager:
         default = AppConfig().gemini.system_prompt
         return self.get('gemini.system_prompt', default)
     
+    def _migrate_api_keys(self) -> None:
+        """Migrate unencrypted API keys to encrypted storage."""
+        encrypted_keys = self.get('gemini.api_keys_encrypted', [])
+        if encrypted_keys:
+            return
+        
+        plain_keys = self.get('gemini.api_keys', [])
+        if plain_keys and isinstance(plain_keys, list):
+            from .logger import get_logger
+            get_logger().info("Migrating API keys to encrypted storage...")
+            
+            encrypted = self._secure_storage.encrypt_list(plain_keys)
+            if any(encrypted):
+                self.set('gemini.api_keys_encrypted', encrypted)
+                self._raw_config['gemini'].pop('api_keys', None)
+                self.save()
+                get_logger().info("API key migration completed")
+    
     def get_api_key(self) -> str:
-        """Get current active API key."""
-        keys = self.get('gemini.api_keys', [])
-        if not keys:
+        """Get current active API key (decrypted)."""
+        encrypted_keys = self.get('gemini.api_keys_encrypted', [])
+        if not encrypted_keys:
             return ''
+        
         index = self.get('gemini.current_key_index', 0)
-        if index >= len(keys):
+        if index >= len(encrypted_keys):
             index = 0
             self.set('gemini.current_key_index', 0)
-        return keys[index]
+        
+        encrypted = encrypted_keys[index]
+        decrypted = self._secure_storage.decrypt(encrypted)
+        return decrypted if decrypted else ''
     
     def get_all_api_keys(self) -> list[str]:
-        """Get all configured API keys."""
-        return self.get('gemini.api_keys', [])
+        """Get all configured API keys (decrypted)."""
+        encrypted_keys = self.get('gemini.api_keys_encrypted', [])
+        if not encrypted_keys:
+            return []
+        return self._secure_storage.decrypt_list(encrypted_keys)
     
     def add_api_key(self, api_key: str) -> bool:
-        """
-        Add a new API key.
+        """Add a new API key (encrypted storage).
         
         Returns:
-            True if added, False if already exists
+            True if added, False if already exists or encryption failed
         """
-        keys = self.get_all_api_keys()
-        if api_key and api_key not in keys:
-            keys.append(api_key)
-            self.set('gemini.api_keys', keys)
-            return True
-        return False
+        if not api_key:
+            return False
+        
+        existing = self.get_all_api_keys()
+        if api_key in existing:
+            return False
+        
+        encrypted = self._secure_storage.encrypt(api_key)
+        if encrypted is None:
+            from .logger import get_logger
+            get_logger().error("Failed to encrypt API key")
+            return False
+        
+        encrypted_keys = self.get('gemini.api_keys_encrypted', [])
+        encrypted_keys.append(encrypted)
+        self.set('gemini.api_keys_encrypted', encrypted_keys)
+        return True
     
     def remove_api_key(self, api_key: str) -> bool:
-        """
-        Remove an API key.
+        """Remove an API key.
         
         Returns:
             True if removed, False if not found
         """
-        keys = self.get_all_api_keys()
-        if api_key in keys:
-            keys.remove(api_key)
-            self.set('gemini.api_keys', keys)
+        all_keys = self.get_all_api_keys()
+        if api_key not in all_keys:
+            return False
+        
+        encrypted_keys = self.get('gemini.api_keys_encrypted', [])
+        decrypted_keys = self._secure_storage.decrypt_list(encrypted_keys)
+        
+        try:
+            index_to_remove = decrypted_keys.index(api_key)
+            encrypted_keys.pop(index_to_remove)
+            self.set('gemini.api_keys_encrypted', encrypted_keys)
             
-            # Reset index if needed
             current_index = self.get('gemini.current_key_index', 0)
-            if current_index >= len(keys) and keys:
+            if current_index >= len(encrypted_keys) and encrypted_keys:
                 self.set('gemini.current_key_index', 0)
             return True
-        return False
+        except ValueError:
+            return False
     
     def rotate_to_next_key(self) -> str:
-        """
-        Rotate to the next API key.
+        """Rotate to the next API key.
         
         Returns:
-            The new current API key
+            The new current API key (decrypted)
         """
-        keys = self.get_all_api_keys()
-        if len(keys) <= 1:
+        encrypted_keys = self.get('gemini.api_keys_encrypted', [])
+        if len(encrypted_keys) <= 1:
             return self.get_api_key()
         
         current_index = self.get('gemini.current_key_index', 0)
-        next_index = (current_index + 1) % len(keys)
+        next_index = (current_index + 1) % len(encrypted_keys)
         self.set('gemini.current_key_index', next_index)
         
-        return keys[next_index]
+        return self.get_api_key()
     
     def is_auto_rotate_enabled(self) -> bool:
         """Check if automatic rotation on quota error is enabled."""
