@@ -1,4 +1,5 @@
 """Status indicator components for AI Assistant Pro."""
+from tkinter import TclError
 import customtkinter as ctk
 from typing import Literal, Optional
 from ui.theme import get_theme
@@ -61,13 +62,13 @@ class StatusIndicator(ctk.CTkFrame):
     
     def _on_destroy(self, event=None):
         """Handle widget destruction."""
-        if event.widget == self:
+        if event and event.widget == self:
             self._destroyed = True
             self._pulse = False
             if self._after_id:
                 try:
                     self.after_cancel(self._after_id)
-                except Exception:
+                except (RuntimeError, TclError, ValueError):
                     pass
                 self._after_id = None
     
@@ -78,7 +79,6 @@ class StatusIndicator(ctk.CTkFrame):
             
         self._pulse_state = (self._pulse_state + 1) % 20
         
-        # Scale effect simulation via size change
         if self._pulse_state < 10:
             scale = 1.0 + (self._pulse_state * 0.02)
         else:
@@ -88,8 +88,7 @@ class StatusIndicator(ctk.CTkFrame):
             new_size = int(self._size * scale)
             self.dot.configure(width=new_size, height=new_size, corner_radius=new_size // 2)
             self._after_id = self.after(80, self._animate_pulse)
-        except Exception:
-            # Widget was destroyed
+        except (RuntimeError, TclError):
             self._destroyed = True
     
     def set_status(self, status: Literal["success", "warning", "error", "info", "inactive"]):
